@@ -1,0 +1,22 @@
+{
+  "name": "@superhero/http-request",
+  "version": "4.0.0",
+  "description": "HTTP request supporting HTTP 1.1 and HTTP 2.0",
+  "main": "index.js",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./index.js"
+  },
+  "scripts": {
+    "test": "node --trace-warnings --test --experimental-test-coverage"
+  },
+  "author": {
+    "name": "Erik Landvall",
+    "email": "erik@landvall.se"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/superhero/config"
+  }
+}
