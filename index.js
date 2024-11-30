@@ -331,7 +331,7 @@ export default class Request
         HEADER_STATUS     = http2.constants.HTTP2_HEADER_STATUS
 
       upstream.statusCode = headers[HEADER_STATUS]
-      upstream.headers    = headers
+      upstream.headers    = { ...headers }
 
       delete upstream.headers[HEADER_STATUS]
       Object.defineProperty(headers, SENSITIVE_HEADERS, { value:headers[SENSITIVE_HEADERS] })
@@ -382,7 +382,7 @@ export default class Request
     const response =
     {
       status  : readable.statusCode,
-      headers : { ...readable.headers }
+      headers : readable.headers
     }
 
     if((response.status >= 400 && false === !!options.doNotThrowOnErrorStatus)
