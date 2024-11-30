@@ -388,7 +388,7 @@ export default class Request
     if((response.status >= 400 && false === !!options.doNotThrowOnErrorStatus)
     || (response.status >= 300 && false === !!options.doNotThrowOnRedirectStatus && response.status < 400))
     {
-      const error     = new Error(`Invalid HTTP status ${response.status} ${method} -> ${url}`)
+      const error     = new Error(`Invalid HTTP status ${response.status} ${method} ${url}`)
       error.code      = 'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS'
       error.response  = response
 
@@ -667,7 +667,7 @@ export default class Request
    */
   #onStreamError(method, url, response, reason)
   {
-    const error     = new Error(`Downstream error [${reason.code}] ${method} -> ${url}`)
+    const error     = new Error(`Downstream error [${reason.code}] ${method} ${url}`)
     error.code      = 'E_HTTP_REQUEST_DOWNSTREAM_ERROR'
     error.cause     = reason
     error.response  = response
@@ -697,7 +697,7 @@ export default class Request
       }
       catch(reason)
       {
-        const error     = new TypeError(`Invalid JSON format ${method} -> ${url}`)
+        const error     = new TypeError(`Invalid JSON format ${method} ${url}`)
         error.code      = 'E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT'
         error.cause     = reason
         error.response  = response
