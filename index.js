@@ -731,7 +731,7 @@ export default class Request
 
   #contentTypeTextEventStream(body)
   {
-    return body.split('\n\n').map((fields) => 
+    return body?.trim().split('\n\n').map((fields) => 
     {
       return Object.fromEntries(fields.split('\n').map((field) =>
       {
