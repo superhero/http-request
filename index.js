@@ -689,23 +689,66 @@ export default class Request
    */
   #onStreamEnd(method, url, response, accept, reject)
   {
-    if(response.headers['content-type']?.startsWith('application/json'))
+    try
     {
-      try
+      const contentType = response.headers['content-type']
+
+      if(contentType?.startsWith('application/json'))
       {
-        response.body = JSON.parse(response.body || '{}')
+        response.body = this.#contentTypeApplicationJson(response.body)
       }
-      catch(reason)
+      else if(contentType?.startsWith('text/event-stream'))
       {
-        const error     = new TypeError(`Invalid JSON format ${method} ${url}`)
-        error.code      = 'E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT'
-        error.cause     = reason
-        error.response  = response
-        reject(error)
-        return 
+        response.body = this.#contentTypeTextEventStream(response.body)
       }
     }
-
+    catch(reason)
+    {
+      const error     = new TypeError(`Invalid response body format ${method} ${url}`)
+      error.code      = 'E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT'
+      error.cause     = reason
+      error.response  = response
+      reject(error)
+      return 
+    }
+    
     accept(response)
+  }
+
+  #contentTypeApplicationJson(body)
+  {
+    try
+    {
+      return JSON.parse(body || '{}')
+    }
+    catch(reason)
+    {
+      const error = new TypeError(`Invalid JSON format`)
+      error.cause = reason
+      throw error
+    }
+  }
+
+  #contentTypeTextEventStream(body)
+  {
+    return body.split('\n\n').map((fields) => 
+    {
+      return Object.fromEntries(fields.split('\n').map((field) =>
+      {
+        const
+          separator = field.indexOf(':'),
+          param     = field.slice(0, separator),
+          value     = field.slice(separator + 1).trim()
+
+        try
+        {
+          return [ param, JSON.parse(value)]
+        }
+        catch(reason)
+        {
+          return [ param, value ]
+        }
+      }))
+    })
   }
 }

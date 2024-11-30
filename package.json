@@ -1,6 +1,6 @@
 {
   "name": "@superhero/http-request",
-  "version": "4.0.3",
+  "version": "4.0.4",
   "description": "HTTP request component supporting HTTP 1.1 and HTTP 2.0",
   "keywords": [
     "http request",
