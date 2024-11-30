@@ -1,11 +1,15 @@
 {
   "name": "@superhero/http-request",
-  "version": "4.0.0",
-  "description": "HTTP request supporting HTTP 1.1 and HTTP 2.0",
+  "version": "4.0.1",
+  "description": "HTTP request component supporting HTTP 1.1 and HTTP 2.0",
   "keywords": [
     "http request",
+    "http client",
+    "http2 client",
+    "http2",
+    "http 2.0",
     "http 1.1",
-    "http 2.0"
+    "https"
   ],
   "main": "index.js",
   "license": "MIT",
