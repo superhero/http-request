@@ -334,7 +334,7 @@ export default class Request
       upstream.headers    = { ...headers }
 
       delete upstream.headers[HEADER_STATUS]
-      Object.defineProperty(headers, SENSITIVE_HEADERS, { value:headers[SENSITIVE_HEADERS] })
+      Object.defineProperty(upstream.headers, SENSITIVE_HEADERS, { enumerable:false, value:headers[SENSITIVE_HEADERS] })
 
       this.#resolveOnResponse(options, method, url, accept, reject, upstream)
     })
