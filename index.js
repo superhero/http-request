@@ -53,13 +53,16 @@ export default class Request
    */
   constructor(config)
   {
-    this.config = 'string' === typeof config
-                ? { base:config }
-                : config || {}
+    config = config && JSON.parse(JSON.stringify(config))
+    config = 'string' === typeof config
+           ? { base: config }
+           : config || {}
 
-    const { base, url } = this.config
-    this.config.base = base ?? url
-    delete this.config.url
+    const { base, url } = config
+    config.base = base ?? url
+    delete config.url
+
+    Object.defineProperty(this, 'config', { enumerable: true, value: config })
   }
 
   /**
