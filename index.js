@@ -48,20 +48,18 @@ import { setTimeout as wait } from 'node:timers/promises'
  */
 export default class Request
 {
-  #config
-
   /**
    * @param {RequestOptions} config - The default/fallback request options/configurations.
    */
   constructor(config)
   {
-    this.#config = 'string' === typeof config
-                 ? { base:config }
-                 : config || {}
+    this.config = 'string' === typeof config
+                ? { base:config }
+                : config || {}
 
-    const { base, url } = this.#config
-    this.#config.base = base ?? url
-    delete this.#config.url
+    const { base, url } = this.config
+    this.config.base = base ?? url
+    delete this.config.url
   }
 
   /**
@@ -80,13 +78,13 @@ export default class Request
     {
       await this.close()
 
-      const url = new URL(authority || this.#config.base)
+      const url = new URL(authority || this.config.base)
       authority = url.protocol + '//' + url.host
 
       this.http2Session = http2.connect(authority, ...args.slice(0, 1), () => 
       {
-        this.#config.base = authority
-        this.#config.url  = url.pathname + url.search
+        this.config.base = authority
+        this.config.url  = url.pathname + url.search
         this.http2Session.off('error', reject)
         accept()
       })
@@ -245,11 +243,11 @@ export default class Request
       options = { url:options }
     }
 
-    if(this.#config.url && options.url)
+    if(this.config.url && options.url)
     {
       options.url = options.url[0] === '/' 
                   ? options.url
-                  : this.#config.url + options.url
+                  : this.config.url + options.url
     }
 
     options = Object.assign(
@@ -261,7 +259,7 @@ export default class Request
       url           : '',
       timeout       : 30e3,
       retryOnStatus : []
-    }, this.#config, options)
+    }, this.config, options)
 
     return options.retry
     ? this.#resolveRetryLoop(options)
