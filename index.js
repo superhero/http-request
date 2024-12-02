@@ -75,7 +75,7 @@ export default class Request
    * 
    * @see {@link https://nodejs.org/api/http2.html#http2connectauthority-options-listener}
    */
-  connect(authority, ...args)
+  connect(authority, options)
   {
     return new Promise(async (accept, reject) =>
     {
@@ -83,16 +83,24 @@ export default class Request
 
       const url = new URL(authority || this.config.base)
       authority = url.protocol + '//' + url.host
+      options   = Object.assign({}, this.config, options)
 
-      this.http2Session = http2.connect(authority, ...args.slice(0, 1), () => 
+      this.http2Session = http2.connect(authority, options, () => 
       {
         this.config.base = authority
         this.config.url  = url.pathname + url.search
-        this.http2Session.off('error', reject)
+        this.http2Session.removeAllListeners('error')
         accept()
       })
 
-      this.http2Session.once('error', reject)
+      this.http2Session.once('error', (reason) =>
+      {
+        const error = new Error(`Failed to connect to server over HTTP2 using authority: ${authority}`)
+        error.code  = 'E_HTTP_REQUEST_CONNECT_ERROR'
+        error.cause = reason
+        reject(error)
+      })
+
       this.http2Session.once('close', () => 
       {
         this.http2Session.removeAllListeners()
