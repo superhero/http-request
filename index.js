@@ -83,28 +83,25 @@ export default class Request
 
       const url = new URL(authority || this.config.base)
       authority = url.protocol + '//' + url.host
-      options   = Object.assign({}, this.config, options)
+      options   = Object.assign(this.config, options)
 
+      this.config.base  = authority
+      this.config.url   = url.pathname + url.search
       this.http2Session = http2.connect(authority, options, () => 
       {
-        this.config.base = authority
-        this.config.url  = url.pathname + url.search
         this.http2Session.removeAllListeners('error')
+        this.http2Session.on('error', console.error)
+
         accept()
       })
 
+      // If there is a error on connection, reject the promise.
       this.http2Session.once('error', (reason) =>
       {
         const error = new Error(`Failed to connect to server over HTTP2 using authority: ${authority}`)
         error.code  = 'E_HTTP_REQUEST_CONNECT_ERROR'
         error.cause = reason
         reject(error)
-      })
-
-      this.http2Session.once('close', () => 
-      {
-        this.http2Session.removeAllListeners()
-        delete this.http2Session
       })
     })
   }
@@ -118,21 +115,41 @@ export default class Request
   {
     return new Promise((accept, reject) =>
     {
-      if(this.http2Session
-      && this.http2Session.closed === false)
+      const http2Session = this.http2Session
+
+      if(http2Session)
       {
-        this.http2Session.close((error) =>
+        http2Session.removeAllListeners()
+
+        if(false === http2Session.closed)
         {
-          error
-          ? reject(error)
-          : accept()
-        })
+          http2Session.close((error) =>
+          {
+            delete this.http2Session
+
+            error
+            ? reject(error)
+            : accept()
+          })
+
+          return // await the close event
+        }
+
+        delete this.http2Session
       }
-      else
-      {
-        accept()
-      }
+
+      // fallback to accept if nothing to close
+      accept()
     })
+  }
+
+  /**
+   * Reonnects to a HTTP/2 server using the last used configurations.
+   */
+  async reconnect()
+  {
+    await this.close()
+    await this.connect()
   }
 
   /**
@@ -245,7 +262,18 @@ export default class Request
    * 
    * @param {string} method 
    * @param {RequestOptions} options 
+   * 
    * @returns {RequestResponse}
+   * 
+   * @throws {Error} E_HTTP_REQUEST_CLIENT_ERROR
+   * @throws {Error} E_HTTP_REQUEST_CLIENT_TIMEOUT
+   * @throws {Error} E_HTTP_REQUEST_DOWNSTREAM_ERROR
+   * @throws {Error} E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT
+   * @throws {Error} E_HTTP_REQUEST_INVALID_RESPONSE_STATUS
+   * @throws {Error} E_HTTP_REQUEST_HTTP2_SESSION_DESTROYED
+   * @throws {Error} E_HTTP_REQUEST_HTTP2_SESSION_CLOSED
+   * @throws {Error} E_HTTP_REQUEST_RETRY_HTTP2_RECONNECT
+   * @throws {Error} E_HTTP_REQUEST_RETRY_ERROR
    */
   #fetch(method, options)
   {
@@ -284,11 +312,6 @@ export default class Request
    * @param {RequestOptions}  options
    * 
    * @returns {RequestResponse}
-   * 
-   * @throws {Error} E_HTTP_REQUEST_CLIENT_TIMEOUT
-   * @throws {Error} E_HTTP_REQUEST_CLIENT_ERROR
-   * @throws {Error} E_HTTP_REQUEST_DOWNSTREAM_ERROR
-   * @throws {Error} E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT
    */
   #resolve(options)
   {
@@ -315,6 +338,22 @@ export default class Request
 
   #resolveHttp2Client(options, method, headers, url, accept, reject)
   {
+    if(true === this.http2Session.destroyed)
+    {
+      const error = new Error('Session destroyed')
+      error.code  = 'E_HTTP_REQUEST_HTTP2_SESSION_DESTROYED'
+      error.cause = `Can not perform request over a destroyed HTTP2 session to: ${url}`
+      return reject(error)
+    }
+
+    if(true === this.http2Session.closed)
+    {
+      const error = new Error('Session closed')
+      error.code  = 'E_HTTP_REQUEST_HTTP2_SESSION_CLOSED'
+      error.cause = `Can not perform request over a closed HTTP2 session to: ${url}`
+      return reject(error)
+    }
+
     delete headers['transfer-encoding']
 
     const { pathname, search } = new URL(url)
@@ -369,7 +408,7 @@ export default class Request
   #connectionClosed(upstream, reject)
   {
     upstream.removeAllListeners()
-    const error = new Error('The connection was closed unexpectedly')
+    const error = new Error('Connection was closed unexpectedly')
     error.code  = 'E_HTTP_REQUEST_CLIENT_ERROR'
     setImmediate(() => reject(error)) // this error is a fallback if the promise is not already resolved
   }
@@ -419,18 +458,14 @@ export default class Request
 
   /**
    * Resolves the request in a retry loop.
-   * 
    * @param {RequestOptions} options
-   * 
    * @returns {RequestResponse}
-   * 
-   * @throws {Error} E_HTTP_REQUEST_RETRY
    */
   async #resolveRetryLoop(options)
   {
     const errorTrace = []
 
-    let retry = Math.abs(Math.floor(options.retry))
+    let retry = Math.abs(Math.floor(options.retry)) + 1
 
     while(retry--)
     {
@@ -458,10 +493,22 @@ export default class Request
         }
         else
         {
-          this.#resolveRetryLoopError(options, errorTrace, error)
+          await this.#resolveRetryLoopError(options, errorTrace, error)
           await wait(options.retryDelay)
         }
       }
+    }
+
+    if(errorTrace.every((error) => error.code === errorTrace[0].code))
+    {
+      throw errorTrace.pop()
+    }
+    else
+    {
+      const error = new Error('Multiple types of errors occurred during the retry loop')
+      error.code  = 'E_HTTP_REQUEST_RETRY_ERROR'
+      error.cause = errorTrace
+      throw error
     }
   }
 
@@ -473,19 +520,29 @@ export default class Request
    * @param {Error}           error
    * 
    * @returns {Void}
-   * 
-   * @throws {Error} E_HTTP_REQUEST_CLIENT_ERROR
-   * @throws {Error} E_HTTP_REQUEST_CLIENT_TIMEOUT
-   * @throws {Error} E_HTTP_REQUEST_DOWNSTREAM_ERROR
-   * @throws {Error} E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT
-   * @throws {Error} E_HTTP_REQUEST_INVALID_RESPONSE_STATUS
    */
-  #resolveRetryLoopError(options, errorTrace, error)
+  async #resolveRetryLoopError(options, errorTrace, error)
   {
     switch(error.code)
     {
       case 'E_HTTP_REQUEST_CLIENT_ERROR':
       {
+        return errorTrace.push(error)
+      }
+      case 'E_HTTP_REQUEST_HTTP2_SESSION_DESTROYED':
+      case 'E_HTTP_REQUEST_HTTP2_SESSION_CLOSED':
+      {
+        try
+        {
+          await this.reconnect()
+        }
+        catch(reason)
+        {
+          const reconnectError = new Error(`${reason.message}, retry to reconnect to the server failed`)
+          reconnectError.code  = 'E_HTTP_REQUEST_RETRY_HTTP2_RECONNECT'
+          reconnectError.cause = reason
+          throw reason
+        }
         return errorTrace.push(error)
       }
       case 'E_HTTP_REQUEST_CLIENT_TIMEOUT':
