@@ -346,7 +346,7 @@ export default class Request
   #resolveHttp1Client(options, method, headers, url, accept, reject)
   {
     const
-      request   = url.protocol === 'https:' ? https.request : http.request,
+      request   = url.startsWith('https:') ? https.request : http.request,
       config    = Object.assign({}, options, { headers }),
       upstream  = request(url, config)
 
