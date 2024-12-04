@@ -376,14 +376,14 @@ suite('@superhero/http-request', () =>
           const options =
           {
             url           : '/retry-on-status',
-            retry         : 2, 
+            retry         : 2,
             retryDelay    : 100, 
             retryOnStatus : [ 503 ]
           }
   
           await assert.rejects(
             request.get(options),
-            (error) => error.code === 'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS',
+            { code:'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS' },
             'Should throw an error after the second attempt')
   
           assert.equal(attempt, 2, 'Should make exactly 2 attempts')

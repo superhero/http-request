@@ -465,7 +465,7 @@ export default class Request
   {
     const errorTrace = []
 
-    let retry = Math.abs(Math.floor(options.retry)) + 1
+    let retry = Math.abs(Math.floor(options.retry))
 
     while(retry--)
     {
