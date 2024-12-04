@@ -603,8 +603,8 @@ export default class Request
   #createBodyHeaderDelimiter(body, isStreamed)
   {
     return isStreamed
-    ? { 'transfer-encoding': 'chunked' }
-    : { 'content-length' : body.length }
+    ? { 'transfer-encoding' : 'chunked' }
+    : { 'content-length'    : body?.length || 0 }
   }
 
   /**
