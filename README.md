@@ -95,11 +95,12 @@ console.log(response.body)
 
 Errors are thrown with specific error codes for easier handling:
 
-- `E_HTTP_REQUEST_CLIENT_ERROR`
-- `E_HTTP_REQUEST_CLIENT_TIMEOUT`
-- `E_HTTP_REQUEST_DOWNSTREAM_ERROR`
-- `E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT`
-- `E_HTTP_REQUEST_INVALID_RESPONSE_STATUS`
+- `E_HTTP_REQUEST_FAILED`
+  - `E_HTTP_REQUEST_CLIENT_ERROR`
+  - `E_HTTP_REQUEST_CLIENT_TIMEOUT`
+  - `E_HTTP_REQUEST_DOWNSTREAM_ERROR`
+  - `E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT`
+  - `E_HTTP_REQUEST_INVALID_RESPONSE_STATUS`
 
 Example:
 
@@ -334,10 +335,10 @@ pass 42
 ----------------------------------------------------------------------------------------
 file            | line % | branch % | funcs % | uncovered lines
 ----------------------------------------------------------------------------------------
-index.js        |  94.05 |    91.74 |   92.86 | 496-505 533-535 671-677 702-705 735-755
+index.js        |  89.56 |    87.39 |   86.67 | 100-104 137-139 150-153 353-357 361-365
 index.test.js   | 100.00 |    97.67 |  100.00 | 
 ----------------------------------------------------------------------------------------
-all files       |  96.57 |    94.36 |   97.17 | 
+all files       |  93.73 |    91.71 |   94.50 |
 ----------------------------------------------------------------------------------------
 ```
 

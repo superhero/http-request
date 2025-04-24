@@ -275,7 +275,7 @@ export default class Request
    * @throws {Error} E_HTTP_REQUEST_RETRY_HTTP2_RECONNECT
    * @throws {Error} E_HTTP_REQUEST_RETRY_ERROR
    */
-  #fetch(method, options)
+  async #fetch(method, options)
   {
     if(typeof options === 'string')
     {
@@ -300,9 +300,19 @@ export default class Request
       retryOnStatus : []
     }, this.config, options)
 
-    return options.retry
-    ? this.#resolveRetryLoop(options)
-    : this.#resolve(options)
+    try
+    {
+      return options.retry
+      ? await this.#resolveRetryLoop(options)
+      : await this.#resolve(options)
+    }
+    catch(reason)
+    {
+      const error = new Error(`Failed request ${method} ${options.url}`)
+      error.code  = 'E_HTTP_REQUEST_FAILED'
+      error.cause = reason
+      throw error
+    }
   }
 
   /**
@@ -463,7 +473,7 @@ export default class Request
    */
   async #resolveRetryLoop(options)
   {
-    const errorTrace = []
+    const reasons = []
 
     let retry = Math.abs(Math.floor(options.retry))
 
@@ -485,30 +495,32 @@ export default class Request
           return response
         }
       }
-      catch(error)
+      catch(reason)
       {
-        if(retry === 0)
+        if(retry <= 0)
         {
-          throw error
+          reasons.push(reason)
         }
         else
         {
-          await this.#resolveRetryLoopError(options, errorTrace, error)
+          await this.#resolveRetryLoopError(options, reasons, reason)
           await wait(options.retryDelay)
         }
       }
     }
 
-    if(errorTrace.every((error) => error.code === errorTrace[0].code))
+    const 
+      uniqueReasons = reasons.filter((reason, i) => [i, -1].includes(reasons.lastIndexOf(({ code }) => code === reason.code))),
+      reason        = uniqueReasons.pop()
+
+    if(uniqueReasons.length === 1)
     {
-      throw errorTrace.pop()
+      throw reason
     }
     else
     {
-      const error = new Error('Multiple types of errors occurred during the retry loop')
-      error.code  = 'E_HTTP_REQUEST_RETRY_ERROR'
-      error.cause = errorTrace
-      throw error
+      reason.previous = uniqueReasons
+      throw reason
     }
   }
 
@@ -516,18 +528,18 @@ export default class Request
    * Resolves the error in the retry loop.
    * 
    * @param {RequestOptions}  options
-   * @param {Error[]}         errorTrace
-   * @param {Error}           error
+   * @param {Error[]}         reasons
+   * @param {Error}           reason
    * 
    * @returns {Void}
    */
-  async #resolveRetryLoopError(options, errorTrace, error)
+  async #resolveRetryLoopError(options, reasons, reason)
   {
-    switch(error.code)
+    switch(reason.code)
     {
       case 'E_HTTP_REQUEST_CLIENT_ERROR':
       {
-        return errorTrace.push(error)
+        return reasons.push(reason)
       }
       case 'E_HTTP_REQUEST_HTTP2_SESSION_DESTROYED':
       case 'E_HTTP_REQUEST_HTTP2_SESSION_CLOSED':
@@ -535,67 +547,68 @@ export default class Request
         try
         {
           await this.reconnect()
+          return reasons.push(reason)
         }
         catch(reason)
         {
-          const reconnectError = new Error(`${reason.message}, retry to reconnect to the server failed`)
-          reconnectError.code  = 'E_HTTP_REQUEST_RETRY_HTTP2_RECONNECT'
-          reconnectError.cause = reason
+          const error   = new Error(`${reason.message}, retry to reconnect to the server failed`)
+          error.code    = 'E_HTTP_REQUEST_RETRY_HTTP2_RECONNECT'
+          error.cause   = reason
+          error.reasons = reasons
           throw reason
         }
-        return errorTrace.push(error)
       }
       case 'E_HTTP_REQUEST_CLIENT_TIMEOUT':
       {
         if(options.retryOnClientTimeout)
         {
-          return errorTrace.push(error)
+          return reasons.push(reason)
         }
         else
         {
-          throw error
+          throw reason
         }
       }
       case 'E_HTTP_REQUEST_DOWNSTREAM_ERROR':
       {
         if(options.retryOnDownstreamError)
         {
-          return errorTrace.push(error)
+          return reasons.push(reason)
         }
         else
         {
-          throw error
+          throw reason
         }
       }
       case 'E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT':
       {
         if(options.retryOnInvalidResponseBodyFormat)
         {
-          return errorTrace.push(error)
+          return reasons.push(reason)
         }
         else
         {
-          throw error
+          throw reason
         }
       }
       case 'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS':
       {
         if(options.retryOnErrorResponseStatus)
         {
-          return errorTrace.push(error)
+          return reasons.push(reason)
         }
-        else if(options.retryOnStatus.includes(error.response.status))
+        else if(options.retryOnStatus.includes(reason.response.status))
         {
-          return errorTrace.push(error)
+          return reasons.push(reason)
         }
         else
         {
-          throw error
+          throw reason
         }
       }
       default:
       {
-        throw error
+        throw reason
       }
     }
   }

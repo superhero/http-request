@@ -199,10 +199,10 @@ suite('@superhero/http-request', () =>
         }
         await assert.rejects(
           request.get(options),
-          (error) => error.code === 'E_HTTP_REQUEST_CLIENT_TIMEOUT',
+          (error) => error.cause.code === 'E_HTTP_REQUEST_CLIENT_TIMEOUT',
           'Should throw a timeout error')
       })
-  
+
       test('Rejects invalid JSON response accurately', async () => 
       {
         // Alter the server to respond with invalid JSON
@@ -216,7 +216,7 @@ suite('@superhero/http-request', () =>
         // Make the request
         await assert.rejects(
           request.get({ url: '/invalid-json' }),
-          (error) => error.code === 'E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT',
+          (error) => error.cause.code === 'E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT',
           'Should throw a parse error')
       })
 
@@ -383,7 +383,7 @@ suite('@superhero/http-request', () =>
   
           await assert.rejects(
             request.get(options),
-            { code:'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS' },
+            (error) => error.cause.code === 'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS',
             'Should throw an error after the second attempt')
   
           assert.equal(attempt, 2, 'Should make exactly 2 attempts')
@@ -401,7 +401,7 @@ suite('@superhero/http-request', () =>
   
           await assert.rejects(
             request.get(options),
-            (error) => error.code === 'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS',
+            (error) => error.cause.code === 'E_HTTP_REQUEST_INVALID_RESPONSE_STATUS',
             'Should throw an error right away')
   
           assert.equal(attempt, 1, 'Should make exactly 1 attempt')
@@ -547,7 +547,7 @@ suite('@superhero/http-request', () =>
 
         await assert.rejects(
           request.get({ url: '/timeout-test', timeout: 100 }),
-          (error) => error.code === 'E_HTTP_REQUEST_CLIENT_TIMEOUT',
+          (error) => error.cause.code === 'E_HTTP_REQUEST_CLIENT_TIMEOUT',
           'Should throw a timeout error')
       })
     })
