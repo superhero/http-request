@@ -68,8 +68,8 @@ export default class Request
   /**
    * Connects to a HTTP/2 server.
    * 
-   * @param {String} authority the URL
-   * @param {Object} [options]
+   * @param {String|Object} [authority] the URL to connect to the server, or the options object
+   * @param {Object} [options] @see node:http2.connect options
    * 
    * @throws {Error} E_HTTP_REQUEST_CONNECT_INVALID_ARGUMENT
    * 
@@ -77,31 +77,28 @@ export default class Request
    */
   connect(authority, options)
   {
-    return new Promise(async (accept, reject) =>
+    return new Promise(async resolve =>
     {
       await this.close()
 
-      const url = new URL(authority || this.config.base)
-      authority = url.protocol + '//' + url.host
-      options   = Object.assign(this.config, options)
+      if('object' === typeof authority 
+      && null     !== authority
+      && false    === !!options)
+      {
+        options   = authority
+        authority = null
+      }
 
-      this.config.base  = authority
-      this.config.url   = url.pathname + url.search
-      this.http2Session = http2.connect(authority, options, () => 
+      options = Object.assign(this.config, options)
+      const url = new URL(authority || options.authority || options.base || options.url)
+
+      this.config.authority = url.origin
+      this.http2Session     = http2.connect(url.origin, options, () => 
       {
         this.http2Session.removeAllListeners('error')
         this.http2Session.on('error', console.error)
 
-        accept()
-      })
-
-      // If there is a error on connection, reject the promise.
-      this.http2Session.once('error', (reason) =>
-      {
-        const error = new Error(`Failed to connect to server over HTTP2 using authority: ${authority}`)
-        error.code  = 'E_HTTP_REQUEST_CONNECT_ERROR'
-        error.cause = reason
-        reject(error)
+        resolve()
       })
     })
   }
@@ -113,7 +110,7 @@ export default class Request
    */
   close()
   {
-    return new Promise((accept, reject) =>
+    return new Promise((resolve, reject) =>
     {
       const http2Session = this.http2Session
 
@@ -129,7 +126,7 @@ export default class Request
 
             error
             ? reject(error)
-            : accept()
+            : resolve()
           })
 
           return // await the close event
@@ -138,8 +135,8 @@ export default class Request
         delete this.http2Session
       }
 
-      // fallback to accept if nothing to close
-      accept()
+      // fallback to resolve if nothing to close
+      resolve()
     })
   }
 
@@ -282,13 +279,6 @@ export default class Request
       options = { url:options }
     }
 
-    if(this.config.url && options.url)
-    {
-      options.url = options.url[0] === '/' 
-                  ? options.url
-                  : this.config.url + options.url
-    }
-
     options = Object.assign(
     {
       method,
@@ -325,20 +315,20 @@ export default class Request
    */
   #resolve(options)
   {
-    return new Promise((accept, reject) =>
+    return new Promise((resolve, reject) =>
     {
       const
         method    = options.method,
         headers   = this.#normalizeHeaders(options.headers),
         body      = this.#normalizeBody(options.body ?? options.data, headers['content-type']),
         delimiter = this.#createBodyHeaderDelimiter(body, !!options.upstream || !!this.http2Session),
-        url       = this.#normalizeUrl(options.url, options.base)
+        url       = this.#normalizeUrl(options.authority, options.base, options.url)
 
       Object.assign(headers, delimiter)
 
       const upstream = this.http2Session
-      ? this.#resolveHttp2Client(options, method, headers, url, accept, reject)
-      : this.#resolveHttp1Client(options, method, headers, url, accept, reject)
+      ? this.#resolveHttp2Client(options, method, headers, url, resolve, reject)
+      : this.#resolveHttp1Client(options, method, headers, url, resolve, reject)
 
       options.upstream
       ? options.upstream.pipe(upstream)
@@ -346,7 +336,7 @@ export default class Request
     })
   }
 
-  #resolveHttp2Client(options, method, headers, url, accept, reject)
+  #resolveHttp2Client(options, method, headers, url, resolve, reject)
   {
     if(true === this.http2Session.destroyed)
     {
@@ -394,13 +384,13 @@ export default class Request
       delete upstream.headers[HEADER_STATUS]
       Object.defineProperty(upstream.headers, SENSITIVE_HEADERS, { enumerable:false, value:headers[SENSITIVE_HEADERS] })
 
-      this.#resolveOnResponse(options, method, url, accept, reject, upstream)
+      this.#resolveOnResponse(options, method, url, resolve, reject, upstream)
     })
 
     return upstream
   }
 
-  #resolveHttp1Client(options, method, headers, url, accept, reject)
+  #resolveHttp1Client(options, method, headers, url, resolve, reject)
   {
     const
       request   = url.startsWith('https:') ? https.request : http.request,
@@ -410,7 +400,7 @@ export default class Request
     upstream.on('close',    this.#connectionClosed      .bind(this, upstream, reject))
     upstream.on('error',    this.#resolveOnClientError  .bind(this, method, url, reject))
     upstream.on('timeout',  this.#resolveOnClientTimeout.bind(this, upstream, options.timeout, method, url, reject))
-    upstream.on('response', this.#resolveOnResponse     .bind(this, options, method, url, accept, reject))
+    upstream.on('response', this.#resolveOnResponse     .bind(this, options, method, url, resolve, reject))
 
     return upstream
   }
@@ -429,13 +419,13 @@ export default class Request
    * @param {RequestOptions} options
    * @param {String} method
    * @param {String} url
-   * @param {Function} accept Promise accept
+   * @param {Function} resolve Promise resolve
    * @param {Function} reject Promise reject
    * @param {http.IncomingMessage} readable
    * 
    * @returns {Void}
    */
-  #resolveOnResponse(options, method, url, accept, reject, readable)
+  #resolveOnResponse(options, method, url, resolve, reject, readable)
   {
     const response =
     {
@@ -458,11 +448,11 @@ export default class Request
     {
       readable.pipe(options.downstream)
       readable.resume()
-      accept(response)
+      resolve(response)
     }
     else
     {
-      this.#bufferResponseBody(readable, response, method, url, accept, reject)
+      this.#bufferResponseBody(readable, response, method, url, resolve, reject)
     }
   }
 
@@ -509,19 +499,16 @@ export default class Request
       }
     }
 
-    const 
-      uniqueReasons = reasons.filter((reason, i) => [i, -1].includes(reasons.lastIndexOf(({ code }) => code === reason.code))),
-      reason        = uniqueReasons.pop()
+    const
+      unique = reasons.filter((reason, i) => [i, -1].includes(reasons.map(e => e.code).lastIndexOf(code => code === reason.code))),
+      reason = unique.pop()
 
-    if(uniqueReasons.length === 1)
+    if(unique.length)
     {
-      throw reason
+      reason.retried = unique
     }
-    else
-    {
-      reason.previous = uniqueReasons
-      throw reason
-    }
+
+    throw reason
   }
 
   /**
@@ -662,17 +649,28 @@ export default class Request
 
   /**
    * Normalizes the URL.
+   * One of authority or base must be provided,
    * 
-   * @param {String} url
-   * @param {String} base
+   * @param {String} [base] 
+   * @param {String} [authority] the URL origin (e.g. https://example.com)
+   * @param {String} [url]
    * 
    * @returns {String} Normalized URL
    */
-  #normalizeUrl(url, base)
+  #normalizeUrl(authority, base, url)
   {
+    let baseURL = authority && base
+      ? new URL(base, authority)
+      : new URL(base || authority)
+
+    if(url && false === baseURL.pathname.endsWith('/'))
+    {
+      baseURL = new URL(baseURL.pathname + '/', baseURL.href)
+    }
+
     return url
-    ? new URL(url, base).toString()
-    : new URL(base).toString()
+    ? new URL(url, baseURL.href).href
+    : baseURL.href
   }
 
   /**
@@ -723,12 +721,12 @@ export default class Request
     upstream.destroy(error)
   }
 
-  #bufferResponseBody(readable, response, method, url, accept, reject)
+  #bufferResponseBody(readable, response, method, url, resolve, reject)
   {
     response.body = ''
     readable.on('data',   (chunk) => response.body += chunk)
     readable.on('error',  this.#onStreamError.bind(this, method, url, response))
-    readable.on('end',    this.#onStreamEnd  .bind(this, method, url, response, accept, reject))
+    readable.on('end',    this.#onStreamEnd  .bind(this, method, url, response, resolve, reject))
     readable.resume()
   }
 
@@ -759,14 +757,14 @@ export default class Request
    * @param {String} method
    * @param {String} url
    * @param {http.IncomingMessage} response
-   * @param {Function} accept promise accept
+   * @param {Function} resolve promise resolve
    * @param {Function} reject promise reject
    * 
    * @returns {void}
    * 
    * @throws {Error} E_HTTP_REQUEST_INVALID_RESPONSE_BODY_FORMAT
    */
-  #onStreamEnd(method, url, response, accept, reject)
+  #onStreamEnd(method, url, response, resolve, reject)
   {
     try
     {
@@ -791,7 +789,7 @@ export default class Request
       return 
     }
     
-    accept(response)
+    resolve(response)
   }
 
   #contentTypeApplicationJson(body)

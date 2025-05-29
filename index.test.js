@@ -53,6 +53,50 @@ suite('@superhero/http-request', () =>
       assert.equal(response.body.url, '/', 'Should result to /')
     })
 
+    test('Request using a relative path', async sub =>
+    {
+      // ...close the server that was started before the
+      // sub tests starts another server for each test...
+      await request.close()
+      await new Promise(resolve => server.close(resolve))
+
+      await sub.test('Request using an absolute path with a trailing base path slash', async () =>
+      {
+        const base = request.config.base || ''
+        request.config.base = base + '/path/'
+        const response = await request.get('/foobar')
+        assert.equal(response.status, 200, 'Should return a 200 status code')
+        assert.equal(response.body.url, '/foobar', 'Should result to the absolute path')
+      })
+
+      await sub.test('Request using a absolute path with out a trailing base path slash', async () =>
+      {
+        const base = request.config.base || ''
+        request.config.base = base + '/path'
+        const response = await request.get('/foobar')
+        assert.equal(response.status, 200, 'Should return a 200 status code')
+        assert.equal(response.body.url, '/foobar', 'Should result to the absolute path')
+      })
+
+      await sub.test('Request using a relative path with a trailing base path slash', async () =>
+      {
+        const base = request.config.base || ''
+        request.config.base = base + '/path/'
+        const response = await request.get('foobar')
+        assert.equal(response.status, 200, 'Should return a 200 status code')
+        assert.equal(response.body.url, '/path/foobar', 'Should result to the absolute path')
+      })
+
+      await sub.test('Request using a relative path with out a trailing base path slash', async () =>
+      {
+        const base = request.config.base || ''
+        request.config.base = base + '/path'
+        const response = await request.get('foobar')
+        assert.equal(response.status, 200, 'Should return a 200 status code')
+        assert.equal(response.body.url, '/path/foobar', 'Should result to the absolute path')
+      })
+    })
+
     test('Request using a string body', async () =>
     {
       const response = await request.post({ body: 'test body' })
@@ -503,7 +547,7 @@ suite('@superhero/http-request', () =>
       })
     })
 
-    afterEach((done) => request.close().then(() => server.close(done)))
+    afterEach(done => request.close().then(() => server.close(done)))
   
     executeTheSameTestSuitFor_http1_http2()
 
