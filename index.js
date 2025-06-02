@@ -18,8 +18,9 @@ import { setTimeout as wait } from 'node:timers/promises'
 /**
  * @typedef {Object} RequestOptions
  * 
- * @property {String} url   - The URL to make the request to.
- * @property {String} base  - The base path to resolve the URL against.
+ * @property {String} [method] - The HTTP method to use.
+ * @property {String} url - The URL to make the request to.
+ * @property {String} base - The base path to resolve the URL against.
  * @property {Object.<String, String>} [headers] - The request headers.
  * @property {Object|String} [body] - The request body.
  * @property {Object|String} [data] - Alias for body.
@@ -35,7 +36,6 @@ import { setTimeout as wait } from 'node:timers/promises'
  * @property {Boolean} [doNotThrowOnRedirectStatus] - Set to true to avoid throwing on redirect status.
  * @property {Stream.Readable>} [upstream] - An optional upstream stream to make it possible to pipe body to the upstream directly.
  * @property {Stream.Writable} [downstream] - An optional downstream stream to make it possible to pipe body from the downstream to.
- * @property {String} [method] - The HTTP method to use.
  * 
  * @see {@link https://nodejs.org/api/http.html#httprequestoptions-callback}
  * @see {@link https://nodejs.org/api/https.html#httpsrequestoptions-callback}
@@ -159,7 +159,9 @@ export default class Request
    */
   get(options)
   {
-    return this.#fetch('GET', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'GET'
+    return this.fetch(options)
   }
 
   /**
@@ -172,7 +174,9 @@ export default class Request
    */
   post(options)
   {
-    return this.#fetch('POST', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'POST'
+    return this.fetch(options)
   }
 
   /**
@@ -185,7 +189,9 @@ export default class Request
    */
   put(options)
   {
-    return this.#fetch('PUT', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'PUT'
+    return this.fetch(options)
   }
 
   /**
@@ -198,7 +204,9 @@ export default class Request
    */
   patch(options)
   {
-    return this.#fetch('PATCH', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'PATCH'
+    return this.fetch(options)
   }
 
   /**
@@ -210,7 +218,9 @@ export default class Request
    */
   delete(options)
   {
-    return this.#fetch('DELETE', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'DELETE'
+    return this.fetch(options)
   }
 
   /**
@@ -223,7 +233,9 @@ export default class Request
    */
   head(options)
   {
-    return this.#fetch('HEAD', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'HEAD'
+    return this.fetch(options)
   }
 
   /**
@@ -236,7 +248,9 @@ export default class Request
    */
   options(options)
   {
-    return this.#fetch('OPTIONS', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'OPTIONS'
+    return this.fetch(options)
   }
 
   /**
@@ -251,17 +265,19 @@ export default class Request
    */
   trace(options)
   {
-    return this.#fetch('TRACE', options)
+    options = this.#normalizeOptions(options)
+    options.method = 'TRACE'
+    return this.fetch(options)
   }
 
   /**
    * Generic fetch method.
    * 
-   * @param {string} method 
    * @param {RequestOptions} options 
    * 
    * @returns {RequestResponse}
    * 
+   * @throws {TypeError} E_HTTP_REQUEST_INVALID_METHOD
    * @throws {Error} E_HTTP_REQUEST_CLIENT_ERROR
    * @throws {Error} E_HTTP_REQUEST_CLIENT_TIMEOUT
    * @throws {Error} E_HTTP_REQUEST_DOWNSTREAM_ERROR
@@ -272,16 +288,11 @@ export default class Request
    * @throws {Error} E_HTTP_REQUEST_RETRY_HTTP2_RECONNECT
    * @throws {Error} E_HTTP_REQUEST_RETRY_ERROR
    */
-  async #fetch(method, options)
+  async fetch(options)
   {
-    if(typeof options === 'string')
-    {
-      options = { url:options }
-    }
-
+    options = this.#normalizeOptions(options)
     options = Object.assign(
     {
-      method,
       headers       : {},
       retry         : 3,
       retryDelay    : 200,
@@ -289,6 +300,15 @@ export default class Request
       timeout       : 30e3,
       retryOnStatus : []
     }, this.config, options)
+
+    if('string' !== typeof options.method)
+    {
+      const error = new TypeError(`Method must be a string, got ${typeof options.method}`)
+      error.code  = 'E_HTTP_REQUEST_INVALID_METHOD'
+      throw error
+    }
+
+    options.method = options.method.toUpperCase()
 
     try
     {
@@ -298,11 +318,21 @@ export default class Request
     }
     catch(reason)
     {
-      const error = new Error(`Failed request ${method} ${options.url}`)
+      const error = new Error(`Failed request ${options.method} ${options.url}`)
       error.code  = 'E_HTTP_REQUEST_FAILED'
       error.cause = reason
       throw error
     }
+  }
+
+  #normalizeOptions(options)
+  {
+    if(typeof options === 'string')
+    {
+      options = { url:options }
+    }
+
+    return options
   }
 
   /**
