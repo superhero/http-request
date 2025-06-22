@@ -1,6 +1,6 @@
 {
   "name": "@superhero/http-request",
-  "version": "4.7.3",
+  "version": "4.7.4",
   "description": "HTTP(S) request component supporting HTTP 1.1 and HTTP 2.0",
   "keywords": [
     "http request",
@@ -23,7 +23,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@superhero/audit": "4.7.3",
+    "@superhero/audit": "4.7.4",
     "@superhero/syntax-check": "0.0.2"
   },
   "author": {
@@ -32,6 +32,6 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/superhero/http-request"
+    "url": "git+https://github.com/superhero/http-request.git"
   }
 }
