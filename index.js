@@ -634,7 +634,7 @@ export default class Request
   {
     return isStreamed
     ? { 'transfer-encoding' : 'chunked' }
-    : { 'content-length'    : body?.length || 0 }
+    : { 'content-length'    : Buffer.byteLength(body || '') }
   }
 
   /**
