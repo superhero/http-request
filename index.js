@@ -689,6 +689,26 @@ export default class Request
    */
   #normalizeUrl(authority, base, url)
   {
+    if(url)
+    {
+      try
+      {
+        return new URL(url).href
+      }
+      catch
+      {
+        // relative URL, continue below
+      }
+    }
+
+    if(false === Boolean(base) 
+    && false === Boolean(authority))
+    {
+      const error = new TypeError('Expected an absolute url, or a base/authority to resolve a relative url')
+      error.code = 'E_HTTP_REQUEST_INVALID_URL_CONFIG'
+      throw error
+    }
+
     let baseURL = authority && base
       ? new URL(base, authority)
       : new URL(base || authority)
@@ -699,8 +719,8 @@ export default class Request
     }
 
     return url
-    ? new URL(url, baseURL.href).href
-    : baseURL.href
+      ? new URL(url, baseURL.href).href
+      : baseURL.href
   }
 
   /**

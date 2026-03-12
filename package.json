@@ -18,13 +18,11 @@
     ".": "./index.js"
   },
   "scripts": {
-    "syntax-check": "syntax-check",
-    "test": "syntax-check; node --test --test-reporter=@superhero/audit/reporter --experimental-test-coverage"
+    "test": "node --test --test-reporter=@superhero/audit/reporter --experimental-test-coverage"
   },
   "dependencies": {},
   "devDependencies": {
-    "@superhero/audit": "4.8.3",
-    "@superhero/syntax-check": "0.0.2"
+    "@superhero/audit": "4.8.3"
   },
   "author": {
     "name": "Erik Landvall",
