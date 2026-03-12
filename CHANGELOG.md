@@ -1,4 +1,10 @@
 ---
+#### v4.8.6
+---
+
+resolved a big bug when calculating the content-length
+
+---
 #### v4.8.5
 ---\n\nVersion alignment...
 

@@ -1,6 +1,6 @@
 {
   "name": "@superhero/http-request",
-  "version": "4.8.5",
+  "version": "4.8.6",
   "description": "HTTP(S) request component supporting HTTP 1.1 and HTTP 2.0",
   "keywords": [
     "http request",
@@ -22,7 +22,7 @@
   },
   "dependencies": {},
   "devDependencies": {
-    "@superhero/audit": "4.8.5"
+    "@superhero/audit": "4.8.6"
   },
   "author": {
     "name": "Erik Landvall",
